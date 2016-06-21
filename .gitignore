@@ -1,0 +1,8 @@
+# Ignore all the files in these Directories
+ipch/
+Fbx_Exporter/Fbx_Exporter/Debug/
+Fbx_Exporter/Fbx_Exporter/FBX SDK 2015.1/
+
+*.sdf
+*.suo
+*.db

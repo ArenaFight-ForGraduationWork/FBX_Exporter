@@ -2,8 +2,8 @@
 #include "Fbx.h"
 
 #define AnimationNodeCount 40	// 애니메이션에 영향을 받는 animation Node 개수
-								// m_uiAnimationNodeIndexCount = m_IndexByName.size();
-								// _matrix파일 맨 윗줄 두번째 인자
+// m_uiAnimationNodeIndexCount = m_IndexByName.size();
+// _matrix파일 맨 윗줄 두번째 인자
 
 CFbx::CFbx()
 {
@@ -14,7 +14,7 @@ CFbx::CFbx()
 	m_IndexByName.clear();
 
 	m_pBaseBoneMatrix = new FbxMatrix[AnimationNodeCount];
-	m_pAnimationMatrix = nullptr;
+	m_ppAnimationMatrix = nullptr;
 	m_ppResultMatrix = nullptr;
 
 	m_iAnimationMaxTime = 0;
@@ -33,6 +33,37 @@ CFbx::CFbx()
 }
 CFbx::~CFbx()
 {
+	Destroy();
+}
+void CFbx::Destroy()
+{
+	m_pFbxScene->Destroy();
+
+	for (unsigned int i = 0; i < m_VertexByIndex.size(); ++i)
+	{
+		m_VertexByIndex[i].clear();
+	}
+	m_VertexByIndex.clear();
+	m_IndexByName.clear();
+
+	if (m_pBaseBoneMatrix)
+		delete[] m_pBaseBoneMatrix;
+	if (m_ppAnimationMatrix)
+	{
+		for (unsigned int i = 0; i < m_iAnimationMaxTime / 10; ++i)
+			delete[] m_ppAnimationMatrix[i];
+	}
+	if (m_ppResultMatrix)
+	{
+		for (unsigned int i = 0; i < m_iAnimationMaxTime / 10; ++i)
+			delete[] m_ppResultMatrix[i];
+	}
+
+	m_pTxtName = nullptr;
+	m_pTxtNameAfterMatrix = nullptr;
+
+	if (m_pVertices)
+		delete[] m_pVertices;
 }
 
 void CFbx::Import(char* pFileName, char* pTxtName, char* pTxtNameAfterMatrix)
@@ -305,12 +336,12 @@ void CFbx::_WriteAnimationMatrix()
 		m_uiAnimationNodeIndexCount = m_IndexByName.size();
 
 		//애니메이션 2차원 배열 생성
-		m_pAnimationMatrix = new FbxMatrix*[m_iAnimationMaxTime / 10];	//최대시간/10만큼 애니메이션행렬 배열 할당
+		m_ppAnimationMatrix = new FbxMatrix*[m_iAnimationMaxTime / 10];	//최대시간/10만큼 애니메이션행렬 배열 할당
 		m_ppResultMatrix = new FbxMatrix*[m_iAnimationMaxTime / 10];	//최대시간/10만큼 애니메이션 최종 변환행렬 배열 할당
 
-		for (int i = 0; i < m_iAnimationMaxTime / 10; ++i)
+		for (unsigned int i = 0; i < m_iAnimationMaxTime / 10; ++i)
 		{
-			m_pAnimationMatrix[i] = new FbxMatrix[m_uiAnimationNodeIndexCount];	//i번째 시간대 : 배열에 애니메이션 노드 개수만큼 배열 할당
+			m_ppAnimationMatrix[i] = new FbxMatrix[m_uiAnimationNodeIndexCount];	//i번째 시간대 : 배열에 애니메이션 노드 개수만큼 배열 할당
 			m_ppResultMatrix[i] = new FbxMatrix[m_uiAnimationNodeIndexCount];	//i번째 시간대 : 최종변환행렬에 애니메이션 노드 개수만큼 배열 할당
 		}
 
@@ -319,16 +350,16 @@ void CFbx::_WriteAnimationMatrix()
 
 		fprintf(fp, "%d %d\n", m_iAnimationMaxTime, m_uiAnimationNodeIndexCount);
 
-		for (int i = 0; i < m_iAnimationMaxTime / 10; ++i)
+		for (unsigned int i = 0; i < m_iAnimationMaxTime / 10; ++i)
 		{
 			for (unsigned int j = 0; j < m_uiAnimationNodeIndexCount; ++j)
 			{
-				m_ppResultMatrix[i][j] = m_pBaseBoneMatrix[j] * m_pAnimationMatrix[i][j];
+				m_ppResultMatrix[i][j] = m_pBaseBoneMatrix[j] * m_ppAnimationMatrix[i][j];
 				for (int k = 0; k < 4; ++k)
 				{
 					for (int l = 0; l < 4; ++l)
 					{
-						fprintf(fp, "%f\n", m_ppResultMatrix[i][j].mData[k][l]);
+						fprintf(fp, "%f\n", m_ppResultMatrix[i][j].Transpose().mData[k][l]);
 					}
 				}
 			}
@@ -376,9 +407,9 @@ void CFbx::_SetAnimationData(FbxNode* pNode)
 				int *ClusterIndices = pCluster->GetControlPointIndices();
 				double *ClusterWeights = pCluster->GetControlPointWeights();
 
-				for (int k = 0; k < ClusterIndexCount; k++)
+				for (int k = 0; k < ClusterIndexCount; ++k)
 				{
-					std::string BoneName = std::string(pCluster->GetLink()->GetName());
+					string BoneName = string(pCluster->GetLink()->GetName());
 					int INDEX = m_IndexByName[BoneName];
 
 					FbxAMatrix transformMatrix;
@@ -389,11 +420,11 @@ void CFbx::_SetAnimationData(FbxNode* pNode)
 					pCluster->GetTransformLinkMatrix(transformLinkMatrix); // The transformation of the cluster(joint) at binding time from joint space to world space
 					ResultMtx = transformLinkMatrix.Inverse() * transformMatrix * geometryTransform;
 
-					for (int m = 0; m < 4; m++)
+					for (int m = 0; m < 4; ++m)
 					{
-						for (int n = 0; n < 4; n++)
+						for (int n = 0; n < 4; ++n)
 						{
-							m_pBaseBoneMatrix[INDEX].mData[m][n] = ResultMtx.Get(m, n);
+							m_pBaseBoneMatrix[INDEX].mData[m][n] = ResultMtx.Transpose().Get(m, n);
 						}
 					}
 
@@ -438,7 +469,7 @@ void CFbx::_SetAnimationMatrix(FbxNode *pNode, FbxAnimStack *FbxAS)
 			{
 				for (int n = 0; n < 4; ++n)
 				{
-					m_pAnimationMatrix[i][BoneIndex].mData[m][n] = pNode->EvaluateGlobalTransform(n_time).Get(m, n);
+					m_ppAnimationMatrix[i][BoneIndex].mData[m][n] = pNode->EvaluateGlobalTransform(n_time).Transpose().Get(m, n);
 				}
 			}
 		}

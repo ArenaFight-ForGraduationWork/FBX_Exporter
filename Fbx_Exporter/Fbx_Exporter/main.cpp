@@ -9,7 +9,6 @@ void main()
 	char pathFront[50];
 	char pathBack[50];
 	int choice = 1;
-	CFbx *pFbx = new CFbx();
 
 	while (1 == choice)
 	{
@@ -31,6 +30,7 @@ void main()
 		cin >> choice;
 		cout << endl;
 
+		CFbx *pFbx = new CFbx();
 		switch (choice)
 		{
 		case 0:
@@ -44,6 +44,7 @@ void main()
 			break;
 		}
 		cout << endl;
+		delete pFbx;
 
 		cout << " * 다른 파일을 더 변환하시려면 1을, 종료하려면 0을 눌러주세요: ";
 		cin >> choice;

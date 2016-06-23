@@ -6,3 +6,5 @@ Fbx_Exporter/Fbx_Exporter/FBX SDK 2015.1/
 *.sdf
 *.suo
 *.db
+*.ilk
+*.pdb
